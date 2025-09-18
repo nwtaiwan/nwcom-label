@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>西北標籤列印小工具</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
@@ -66,7 +68,7 @@
 
         /* A4 列印專用樣式 */
         .a4-page {
-            padding: 1cm; /* 上下左右邊界各1cm */
+            padding: 0.5cm; /* 上下左右邊界各0.5cm */
             box-sizing: border-box;
             background: white;
             page-break-after: always;
@@ -76,19 +78,19 @@
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             margin: 1rem auto;
         }
-        
+       
         .a4-page:last-of-type {
             page-break-after: avoid;
         }
 
         .label-cell {
-            border: 0.5px solid #ccc; /* 標籤框線 */
+            border: 1px solid #ccc; /* 標籤框線 */
             box-sizing: border-box;
             overflow: hidden;
             position: relative;
         }
-        
-        .label-cell svg {
+       
+        .label-cell svg, .label-cell img {
             width: 100%;
             height: 100%;
         }
@@ -158,20 +160,20 @@
                         <div>
                              <label class="block text-sm font-medium text-slate-600 mb-1">標籤尺寸 (cm)</label>
                              <div class="flex items-center gap-2">
-                                <label for="label-width" class="text-sm">寬:</label>
-                                <input type="number" id="label-width" value="6" min="1" step="0.1" class="w-full p-2 border border-slate-300 rounded-md">
+                                 <label for="label-width" class="text-sm">寬:</label>
+                                 <input type="number" id="label-width" value="6" min="1" step="0.1" class="w-full p-2 border border-slate-300 rounded-md">
                             </div>
                             <div class="flex items-center gap-2 mt-2">
-                                <label for="label-height" class="text-sm">高:</label>
-                                <input type="number" id="label-height" value="6" min="1" step="0.1" class="w-full p-2 border border-slate-300 rounded-md">
+                                 <label for="label-height" class="text-sm">高:</label>
+                                 <input type="number" id="label-height" value="6" min="1" step="0.1" class="w-full p-2 border border-slate-300 rounded-md">
                             </div>
                             <button id="apply-size-btn" class="w-full mt-2 px-3 py-2 bg-gray-600 text-white text-sm font-semibold rounded-md hover:bg-gray-700">套用尺寸</button>
                         </div>
                         <div>
                             <label for="paper-orientation" class="block text-sm font-medium text-slate-600 mb-1">紙張方向</label>
                              <select id="paper-orientation" class="w-full p-2 border border-slate-300 rounded-md bg-white">
-                                <option value="portrait" selected>直式 (A4)</option>
-                                <option value="landscape">橫式 (A4)</option>
+                                 <option value="portrait" selected>直式 (A4)</option>
+                                 <option value="landscape">橫式 (A4)</option>
                             </select>
                         </div>
                     </div>
@@ -182,14 +184,14 @@
                         <div class="col-span-2">
                              <label for="font-family" class="block text-sm font-medium text-slate-600 mb-1">字型</label>
                              <select id="font-family" class="w-full p-2 border border-slate-300 rounded-md bg-white">
-                                <option value="'Noto Sans TC', sans-serif" selected>思源黑體 (Noto Sans TC)</option>
-                                <option value="'Noto Serif TC', serif">思源宋體 (Noto Serif TC)</option>
-                                <option value="'Microsoft JhengHei', '微軟正黑體', sans-serif">微軟正黑體 (Microsoft JhengHei)</option>
-                                <option value="KaiTi, '標楷體', serif">標楷體 (KaiTi)</option>
-                                <option value="'Roboto', sans-serif">Roboto</option>
-                                <option value="Arial, sans-serif">Arial</option>
-                                <option value="'Times New Roman', serif">Times New Roman</option>
-                                <option value="'Courier New', monospace">Courier New</option>
+                                 <option value="'Noto Sans TC', sans-serif" selected>思源黑體 (Noto Sans TC)</option>
+                                 <option value="'Noto Serif TC', serif">思源宋體 (Noto Serif TC)</option>
+                                 <option value="'Microsoft JhengHei', '微軟正黑體', sans-serif">微軟正黑體 (Microsoft JhengHei)</option>
+                                 <option value="KaiTi, '標楷體', serif">標楷體 (KaiTi)</option>
+                                 <option value="'Roboto', sans-serif">Roboto</option>
+                                 <option value="Arial, sans-serif">Arial</option>
+                                 <option value="'Times New Roman', serif">Times New Roman</option>
+                                 <option value="'Courier New', monospace">Courier New</option>
                             </select>
                         </div>
                          <div>
@@ -233,20 +235,23 @@
             </div>
         </div>
     </div>
-    
+   
     <!-- Modals -->
     <div id="bulk-print-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full hidden z-50 flex items-center justify-center p-4">
-      <div class="w-full max-w-3xl bg-white rounded-lg shadow-lg flex flex-col" style="height: 90vh;">
+      <div class="w-full max-w-4xl bg-white rounded-lg shadow-lg flex flex-col" style="height: 90vh;">
         <div class="flex justify-between items-center p-4 border-b flex-shrink-0">
             <h3 class="text-lg font-medium text-gray-900">大量列印設定與預覽</h3>
-            <button id="close-bulk-print-btn" class="text-gray-400 hover:text-gray-900">&times;</button>
+            <button id="close-bulk-print-btn" class="text-gray-400 hover:text-gray-900 text-2xl leading-none">&times;</button>
         </div>
         <div class="flex-grow flex p-4 gap-4 overflow-hidden">
             <div class="w-1/3 flex flex-col space-y-4">
                 <label for="data-import" class="block text-sm font-medium text-slate-700">匯入列印清單 (一行一個)</label>
                 <textarea id="data-import" rows="8" class="flex-grow w-full p-2 border rounded-md" placeholder="王小明..."></textarea>
                 <button id="generate-preview-btn" class="w-full px-6 py-2 bg-orange-500 text-white font-bold rounded-md hover:bg-orange-600">產生A4列印預覽</button>
-                <button id="modal-print-btn" class="w-full px-6 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 disabled:bg-gray-400" disabled>列印預覽內容</button>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="modal-direct-print-btn" class="w-full px-4 py-2 bg-sky-600 text-white font-semibold rounded-md hover:bg-sky-700 disabled:bg-gray-400" disabled>直接列印</button>
+                    <button id="modal-pdf-btn" class="w-full px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 disabled:bg-gray-400" disabled>下載 PDF</button>
+                </div>
             </div>
             <div id="modal-print-preview" class="w-2/3 bg-gray-200 p-4 rounded-md overflow-y-auto">
                 <div class="text-center text-gray-500">預覽區域</div>
@@ -254,8 +259,22 @@
         </div>
       </div>
     </div>
+    
+    <!-- Generic Alert/Confirm Modal -->
+    <div id="custom-modal-overlay" class="fixed inset-0 bg-gray-800 bg-opacity-60 h-full w-full hidden z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full animate-fade-in-up">
+            <h3 id="custom-modal-title" class="text-lg font-semibold text-slate-800 mb-4">訊息</h3>
+            <p id="custom-modal-message" class="text-sm text-slate-600 mb-6">這是訊息內容。</p>
+            <div id="custom-modal-buttons" class="flex justify-end gap-3">
+                <!-- Buttons are injected here by JavaScript -->
+            </div>
+        </div>
+    </div>
+
 
     <input type="file" id="file-loader" class="hidden" accept=".json">
+   
+    <script id="font-data"></script>
 
     <script>
         // DOM Elements
@@ -282,18 +301,70 @@
         const closeBulkPrintBtn = document.getElementById('close-bulk-print-btn');
         const generatePreviewBtn = document.getElementById('generate-preview-btn');
         const modalPrintPreview = document.getElementById('modal-print-preview');
-        const modalPrintBtn = document.getElementById('modal-print-btn');
+        const modalPdfBtn = document.getElementById('modal-pdf-btn');
+        const modalDirectPrintBtn = document.getElementById('modal-direct-print-btn');
         const saveBtn = document.getElementById('save-btn');
         const loadBtn = document.getElementById('load-btn');
         const fileLoader = document.getElementById('file-loader');
         
+        // Custom Modal Elements
+        const customModalOverlay = document.getElementById('custom-modal-overlay');
+        const customModalTitle = document.getElementById('custom-modal-title');
+        const customModalMessage = document.getElementById('custom-modal-message');
+        const customModalButtons = document.getElementById('custom-modal-buttons');
+
         let activeElement = null;
+
+        // --- Custom Modal Logic ---
+        const showAlert = (message, title = '提醒') => {
+            customModalTitle.textContent = title;
+            customModalMessage.textContent = message;
+            customModalButtons.innerHTML = ''; // Clear previous buttons
+
+            const okButton = document.createElement('button');
+            okButton.textContent = '確定';
+            okButton.className = 'px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700';
+            okButton.onclick = () => customModalOverlay.classList.add('hidden');
+            
+            customModalButtons.appendChild(okButton);
+            customModalOverlay.classList.remove('hidden');
+            okButton.focus();
+        };
+
+        const showConfirm = (message, callback, title = '請確認') => {
+            customModalTitle.textContent = title;
+            customModalMessage.textContent = message;
+            customModalButtons.innerHTML = ''; // Clear previous buttons
+
+            const confirmButton = document.createElement('button');
+            confirmButton.textContent = '確定';
+            confirmButton.className = 'px-4 py-2 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700';
+            confirmButton.onclick = () => {
+                customModalOverlay.classList.add('hidden');
+                callback(true);
+            };
+
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = '取消';
+            cancelButton.className = 'px-4 py-2 bg-slate-500 text-white font-semibold rounded-md hover:bg-slate-600';
+            cancelButton.onclick = () => {
+                customModalOverlay.classList.add('hidden');
+                callback(false);
+            };
+
+            customModalButtons.appendChild(cancelButton);
+            customModalButtons.appendChild(confirmButton);
+            customModalOverlay.classList.remove('hidden');
+            confirmButton.focus();
+        };
+        // --- End Custom Modal Logic ---
+
 
         const hidePlaceholder = () => { if (placeholder) placeholder.style.display = 'none'; };
         const showPlaceholder = () => {
             if (placeholder && labelCanvas.children.length <= 1) placeholder.style.display = 'flex';
         };
-        
+       
         const updateCanvasSize = () => {
             const widthCm = parseFloat(labelWidthInput.value) || 6;
             const heightCm = parseFloat(labelHeightInput.value) || 6;
@@ -313,7 +384,7 @@
             labelCanvas.style.width = `${newWidth}px`;
             labelCanvas.style.height = `${newHeight}px`;
         };
-        
+       
         applySizeBtn.addEventListener('click', updateCanvasSize);
 
         const makeEditable = (element) => {
@@ -390,14 +461,14 @@
             labelCanvas.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
             activeElement = element;
             activeElement.classList.add('selected');
-            
+           
             deleteBtn.disabled = false;
 
             if (activeElement.classList.contains('text-element')) {
                 setVariableBtn.disabled = false;
                 const computedStyle = getComputedStyle(activeElement);
                 const currentFont = computedStyle.fontFamily.split(',')[0].replace(/"/g, '').trim();
-                
+               
                 let foundFont = false;
                 Array.from(fontFamilySelect.options).forEach(opt => {
                     if (opt.value.includes(currentFont)) {
@@ -422,7 +493,7 @@
             deleteBtn.disabled = true;
             setVariableBtn.disabled = true;
         };
-        
+       
         const rgbToHex = (rgb) => {
             if (!rgb || !rgb.startsWith('rgb')) return '#000000';
             let [r, g, b] = rgb.match(/\d+/g).map(Number);
@@ -500,7 +571,7 @@
             }
         };
         [fontFamilySelect, fontWeightSelect, fontSizeInput, fontColorInput, textOrientationSelect].forEach(input => input.addEventListener('input', updateActiveTextStyle));
-        
+       
         setVariableBtn.addEventListener('click', () => {
             if (activeElement && activeElement.classList.contains('text-element')) {
                 const currentVar = labelCanvas.querySelector('.variable-text');
@@ -519,13 +590,15 @@
         deleteBtn.addEventListener('click', deleteActiveElement);
 
         clearBtn.addEventListener('click', () => { 
-            if(confirm("您確定要清空範本嗎？此操作無法復原。")){
-                while (labelCanvas.children.length > 1) {
-                    labelCanvas.removeChild(labelCanvas.lastChild);
+            showConfirm("您確定要清空範本嗎？此操作無法復原。", (confirmed) => {
+                if (confirmed) {
+                    while (labelCanvas.children.length > 1) {
+                        labelCanvas.removeChild(labelCanvas.lastChild);
+                    }
+                    showPlaceholder();
+                    deselectAll();
                 }
-                showPlaceholder();
-                deselectAll();
-            }
+            });
         });
 
         document.addEventListener('keydown', (e) => {
@@ -557,21 +630,21 @@
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         });
-        
+       
         const loadTemplate = (templateData) => {
              if (templateData && templateData.canvasHTML && templateData.settings) {
-                labelCanvas.innerHTML = templateData.canvasHTML.replace(/ selected/g, '');
-                const settings = templateData.settings;
-                labelWidthInput.value = settings.width; labelHeightInput.value = settings.height;
-                paperOrientationSelect.value = settings.orientation; fontSizeInput.value = settings.fontSize;
-                fontColorInput.value = settings.fontColor; textOrientationSelect.value = settings.textOrientation || 'horizontal-tb';
-                fontFamilySelect.value = settings.fontFamily || "'Noto Sans TC', sans-serif";
-                fontWeightSelect.value = settings.fontWeight || "400";
+                 labelCanvas.innerHTML = templateData.canvasHTML.replace(/ selected/g, '');
+                 const settings = templateData.settings;
+                 labelWidthInput.value = settings.width; labelHeightInput.value = settings.height;
+                 paperOrientationSelect.value = settings.orientation; fontSizeInput.value = settings.fontSize;
+                 fontColorInput.value = settings.fontColor; textOrientationSelect.value = settings.textOrientation || 'horizontal-tb';
+                 fontFamilySelect.value = settings.fontFamily || "'Noto Sans TC', sans-serif";
+                 fontWeightSelect.value = settings.fontWeight || "400";
                 
-                labelCanvas.querySelectorAll('.draggable').forEach(makeEditable);
-                updateCanvasSize(); showPlaceholder(); 
-                deselectAll();
-                return true;
+                 labelCanvas.querySelectorAll('.draggable').forEach(makeEditable);
+                 updateCanvasSize(); showPlaceholder(); 
+                 deselectAll();
+                 return true;
              }
              return false;
         };
@@ -589,107 +662,201 @@
                 try {
                     const data = JSON.parse(event.target.result);
                     if (!loadTemplate(data)) {
-                        alert('檔案格式錯誤，無法讀取範本。');
+                        showAlert('檔案格式錯誤，無法讀取範本。', '讀取失敗');
                     }
                 } catch (err) {
-                    alert('讀取檔案失敗，無效的 JSON 格式。');
+                    showAlert('讀取檔案失敗，無效的 JSON 格式。', '讀取失敗');
                     console.error(err);
                 }
             };
             reader.readAsText(file);
-            e.target.value = ''; // Reset for re-uploading same file
+            e.target.value = '';
         });
 
 
         openBulkPrintBtn.addEventListener('click', () => bulkPrintModal.classList.remove('hidden'));
         closeBulkPrintBtn.addEventListener('click', () => bulkPrintModal.classList.add('hidden'));
-        
-        generatePreviewBtn.addEventListener('click', () => {
-            const names = dataImport.value.trim().split('\n').filter(name => name.trim());
-            if (names.length === 0) { alert('請匯入列印清單。'); return; }
-            const variableElementTpl = labelCanvas.querySelector('.variable-text');
-            if (!variableElementTpl) { alert('請先在範本中選取一個文字物件，並點擊「設定為變動欄位」。'); return; }
-            const labelWidthCm = parseFloat(labelWidthInput.value) || 0;
-            const labelHeightCm = parseFloat(labelHeightInput.value) || 0;
-            if (labelWidthCm <= 0 || labelHeightCm <= 0) { alert("標籤尺寸必須大於0。"); return; }
+       
+        const generatePreview = async () => {
+            // 1. Disable buttons and show loading state
+            modalPdfBtn.disabled = true;
+            modalDirectPrintBtn.disabled = true;
+            generatePreviewBtn.disabled = true;
+            generatePreviewBtn.textContent = '預覽產生中...';
+            modalPrintPreview.innerHTML = `<div class="text-center text-gray-500 p-8">正在產生預覽，請稍候...<br>項目較多時可能需要一些時間。</div>`;
 
-            const orientation = paperOrientationSelect.value;
-            const A4_PAGE_WIDTH_CM = orientation === 'portrait' ? 21 : 29.7;
-            const A4_PAGE_HEIGHT_CM = orientation === 'portrait' ? 29.7 : 21;
-            const A4_PRINT_WIDTH_CM = A4_PAGE_WIDTH_CM - 1;
-            const A4_PRINT_HEIGHT_CM = A4_PAGE_HEIGHT_CM - 1;
-            const cols = Math.floor(A4_PRINT_WIDTH_CM / labelWidthCm);
-            const rows = Math.floor(A4_PRINT_HEIGHT_CM / labelHeightCm);
-            if (cols === 0 || rows === 0) { alert(`標籤尺寸太大，無法放入A4紙張中。`); return; }
-
-            modalPrintPreview.innerHTML = '';
-            const labelsPerPage = cols * rows;
-            const numPages = Math.ceil(names.length / labelsPerPage);
-            
-            const canvasRect = labelCanvas.getBoundingClientRect();
-            const canvasWidth = canvasRect.width;
-            const canvasHeight = canvasRect.height;
-            
-            // --- SVG Generation Logic ---
-            const generateSvgContent = (dynamicText) => {
-                let svgElements = '';
-                Array.from(labelCanvas.children).forEach(node => {
-                    if (!node.classList.contains('draggable')) return;
-                    
-                    const style = window.getComputedStyle(node);
-                    const x = node.offsetLeft;
-                    const y = node.offsetTop;
-                    const w = node.offsetWidth;
-                    const h = node.offsetHeight;
-
-                    if (node.querySelector('img')) {
-                        const img = node.querySelector('img');
-                        svgElements += `<image href="${img.src}" x="${x}" y="${y}" width="${w}" height="${h}" />`;
-                    } else if (node.classList.contains('text-element')) {
-                        let textContent = node.textContent;
-                        if (node.classList.contains('variable-text')) {
-                            textContent = dynamicText;
-                        }
-                        
-                        const textStyle = `font-family:${style.fontFamily}; font-size:${style.fontSize}; font-weight:${style.fontWeight}; fill:${style.color};`;
-                        
-                        let textAnchor = "middle";
-                        let dominantBaseline = "middle";
-                        let textX = x + w / 2;
-                        let textY = y + h / 2;
-                        
-                        if (style.writingMode === 'vertical-rl') {
-                             svgElements += `<text x="${textX}" y="${textY}" style="${textStyle}" text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}" writing-mode="vertical-rl">${textContent}</text>`;
-                        } else {
-                             svgElements += `<text x="${textX}" y="${textY}" style="${textStyle}" text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}">${textContent}</text>`;
-                        }
-                    }
-                });
-                return `<svg viewBox="0 0 ${canvasWidth} ${canvasHeight}" preserveAspectRatio="xMidYMid meet">${svgElements}</svg>`;
-            };
-
-            let nameIndex = 0;
-            for (let i = 0; i < numPages; i++) {
-                const page = document.createElement('div');
-                page.className = 'a4-page';
-                page.style.width = `${A4_PAGE_WIDTH_CM}cm`;
-                page.style.height = `${A4_PAGE_HEIGHT_CM}cm`;
-                page.style.gridTemplateColumns = `repeat(${cols}, ${labelWidthCm}cm)`;
-                page.style.gridTemplateRows = `repeat(${rows}, ${labelHeightCm}cm)`;
-
-                for (let j = 0; j < labelsPerPage && nameIndex < names.length; j++) {
-                    const name = names[nameIndex++];
-                    const cell = document.createElement('div');
-                    cell.className = 'label-cell';
-                    cell.innerHTML = generateSvgContent(name);
-                    page.appendChild(cell);
+            try {
+                // 2. Perform the same validation as before
+                const names = dataImport.value.trim().split('\n').filter(name => name.trim());
+                if (names.length === 0) {
+                    showAlert('請匯入列印清單。');
+                    return;
                 }
-                modalPrintPreview.appendChild(page);
+                const variableElementTpl = labelCanvas.querySelector('.variable-text');
+                if (!variableElementTpl) {
+                    showAlert('請先在範本中選取一個文字物件，並點擊「設定為變動欄位」。');
+                    return;
+                }
+                const labelWidthCm = parseFloat(labelWidthInput.value) || 0;
+                const labelHeightCm = parseFloat(labelHeightInput.value) || 0;
+                if (labelWidthCm <= 0 || labelHeightCm <= 0) {
+                    showAlert("標籤尺寸必須大於0。");
+                    return;
+                }
+                const orientation = paperOrientationSelect.value;
+                const A4_PAGE_WIDTH_CM = orientation === 'portrait' ? 21 : 29.7;
+                const A4_PAGE_HEIGHT_CM = orientation === 'portrait' ? 29.7 : 21;
+                const A4_PRINT_WIDTH_CM = A4_PAGE_WIDTH_CM - 1;
+                const A4_PRINT_HEIGHT_CM = A4_PAGE_HEIGHT_CM - 1;
+                const cols = Math.floor(A4_PRINT_WIDTH_CM / labelWidthCm);
+                const rows = Math.floor(A4_PRINT_HEIGHT_CM / labelHeightCm);
+                if (cols === 0 || rows === 0) {
+                    showAlert(`標籤尺寸 (${labelWidthCm}cm x ${labelHeightCm}cm)太大，無法放入A4紙張中。`);
+                    return;
+                }
+
+                // 3. Setup before generation loop
+                modalPrintPreview.innerHTML = ''; // Clear loading message
+                const labelsPerPage = cols * rows;
+                const numPages = Math.ceil(names.length / labelsPerPage);
+                
+                const originalText = variableElementTpl.textContent;
+                const originallySelected = document.querySelector('.draggable.selected');
+                if (originallySelected) originallySelected.classList.remove('selected');
+
+                // 4. Loop and generate labels using html2canvas
+                let nameIndex = 0;
+                for (let i = 0; i < numPages; i++) {
+                    const page = document.createElement('div');
+                    page.className = 'a4-page';
+                    page.style.width = `${A4_PRINT_WIDTH_CM}cm`;
+                    page.style.height = `${A4_PRINT_HEIGHT_CM}cm`;
+                    page.style.gridTemplateColumns = `repeat(${cols}, ${labelWidthCm}cm)`;
+                    page.style.gridTemplateRows = `repeat(${rows}, ${labelHeightCm}cm)`;
+
+                    for (let j = 0; j < labelsPerPage && nameIndex < names.length; j++) {
+                        const name = names[nameIndex++];
+                        
+                        // Update the text on the main canvas
+                        variableElementTpl.textContent = name;
+                        
+                        // Capture the canvas as an image
+                        const canvas = await html2canvas(labelCanvas, {
+                            backgroundColor: '#FFFFFF',
+                            scale: 2 // A good balance of quality and performance for preview
+                        });
+                        const imgData = canvas.toDataURL('image/png');
+                        
+                        // Create cell and image for the preview
+                        const cell = document.createElement('div');
+                        cell.className = 'label-cell';
+                        const img = document.createElement('img');
+                        img.src = imgData;
+                        cell.appendChild(img);
+                        page.appendChild(cell);
+                    }
+                    modalPrintPreview.appendChild(page);
+                }
+
+                // 5. Cleanup and re-enable buttons
+                variableElementTpl.textContent = originalText;
+                if (originallySelected) originallySelected.classList.add('selected');
+                
+                modalPdfBtn.disabled = false;
+                modalDirectPrintBtn.disabled = false;
+            } catch (error) {
+                console.error("Preview generation failed:", error);
+                showAlert("產生預覽時發生錯誤，請檢查瀏覽器主控台以獲取詳細資訊。", "錯誤");
+                modalPrintPreview.innerHTML = `<div class="text-center text-red-500 p-8">預覽產生失敗。</div>`;
+            } finally {
+                generatePreviewBtn.disabled = false;
+                generatePreviewBtn.textContent = '產生A4列印預覽';
             }
-            modalPrintBtn.disabled = false;
+        };
+
+
+        generatePreviewBtn.addEventListener('click', generatePreview);
+        modalDirectPrintBtn.addEventListener('click', () => window.print());
+       
+        // --- PDF Generation Logic (using html2canvas for perfect fidelity) ---
+        modalPdfBtn.addEventListener('click', async () => {
+            modalPdfBtn.disabled = true;
+            modalDirectPrintBtn.disabled = true;
+            modalPdfBtn.textContent = 'PDF產生中...';
+            
+            try {
+                const names = dataImport.value.trim().split('\n').filter(name => name.trim());
+                 if (names.length === 0) {
+                    showAlert('請匯入列印清單。');
+                    return;
+                }
+                const variableElement = labelCanvas.querySelector('.variable-text');
+                if (!variableElement) {
+                    showAlert('請先在範本中選取一個文字物件，並點擊「設定為變動欄位」。');
+                    return;
+                }
+
+                const labelWidthCm = parseFloat(labelWidthInput.value) || 0;
+                const labelHeightCm = parseFloat(labelHeightInput.value) || 0;
+                const orientation = paperOrientationSelect.value;
+                const A4_PAGE_WIDTH_CM = orientation === 'portrait' ? 21 : 29.7;
+                const A4_PAGE_HEIGHT_CM = orientation === 'portrait' ? 29.7 : 21;
+                const margin = 0.5;
+                const A4_PRINT_WIDTH_CM = A4_PAGE_WIDTH_CM - (margin * 2);
+                const A4_PRINT_HEIGHT_CM = A4_PAGE_HEIGHT_CM - (margin * 2);
+                const cols = Math.floor(A4_PRINT_WIDTH_CM / labelWidthCm);
+                const rows = Math.floor(A4_PRINT_HEIGHT_CM / labelHeightCm);
+                const labelsPerPage = cols * rows;
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({
+                    orientation: orientation === 'portrait' ? 'p' : 'l',
+                    unit: 'cm',
+                    format: 'a4'
+                });
+
+                const originalText = variableElement.textContent;
+                const originallySelected = document.querySelector('.draggable.selected');
+                if (originallySelected) originallySelected.classList.remove('selected');
+
+                let nameIndex = 0;
+                for (let pageNum = 0; pageNum < Math.ceil(names.length / labelsPerPage); pageNum++) {
+                    if (pageNum > 0) doc.addPage();
+                    doc.setLineWidth(0.01);
+
+                    for (let i = 0; i < labelsPerPage && nameIndex < names.length; i++) {
+                        const currentName = names[nameIndex++];
+                        const row = Math.floor(i / cols);
+                        const col = i % cols;
+                        const x_cm = margin + col * labelWidthCm;
+                        const y_cm = margin + row * labelHeightCm;
+
+                        variableElement.textContent = currentName;
+
+                        const canvas = await html2canvas(labelCanvas, {
+                            backgroundColor: '#FFFFFF',
+                            scale: 3 
+                        });
+                        const imgData = canvas.toDataURL('image/png');
+
+                        doc.addImage(imgData, 'PNG', x_cm, y_cm, labelWidthCm, labelHeightCm);
+                        doc.rect(x_cm, y_cm, labelWidthCm, labelHeightCm);
+                    }
+                }
+
+                variableElement.textContent = originalText;
+                if (originallySelected) originallySelected.classList.add('selected');
+
+                doc.save(`labels_${new Date().toISOString().slice(0,10)}.pdf`);
+            } catch (error) {
+                console.error("PDF generation failed:", error);
+                showAlert("產生 PDF 時發生錯誤，請檢查瀏覽器主控台以獲取詳細資訊。", "錯誤");
+            } finally {
+                modalPdfBtn.disabled = false;
+                modalDirectPrintBtn.disabled = false;
+                modalPdfBtn.textContent = '下載 PDF';
+            }
         });
-        
-        modalPrintBtn.addEventListener('click', () => window.print());
 
         document.addEventListener('DOMContentLoaded', () => {
             updateCanvasSize();
