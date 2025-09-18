@@ -66,9 +66,6 @@
         }
 
         /* A4 列印專用樣式 */
-        #modal-print-preview .a4-page {
-            transform-origin: top center;
-        }
         .a4-page {
             padding: 0.5cm; /* 上下左右邊界各0.5cm */
             box-sizing: border-box;
@@ -77,7 +74,6 @@
             display: grid;
             justify-content: start; /* 改為 start 對齊 */
             align-content: start;   /* 改為 start 對齊 */
-            gap: 0; /* 確保標籤之間無間距 */
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             margin: 1rem auto;
         }
@@ -118,7 +114,6 @@
                 margin: 0;
                 box-shadow: none;
                 border: none;
-                transform: scale(1) !important; /* 列印時取消縮放 */
             }
         }
     </style>
@@ -265,6 +260,8 @@
     </div>
 
     <input type="file" id="file-loader" class="hidden" accept=".json">
+    
+    <script id="font-data"></script>
 
     <script>
         // DOM Elements
@@ -685,23 +682,6 @@
                 }
                 modalPrintPreview.appendChild(page);
             }
-
-            // Scale preview to fit container
-            setTimeout(() => {
-                const previewContainer = modalPrintPreview;
-                const firstPage = previewContainer.querySelector('.a4-page');
-                if (!firstPage) return;
-                const containerWidth = previewContainer.clientWidth - 32; // account for padding
-                const pageActualWidth = firstPage.offsetWidth;
-                let scale = 1;
-                if (pageActualWidth > containerWidth) {
-                    scale = containerWidth / pageActualWidth;
-                }
-                previewContainer.querySelectorAll('.a4-page').forEach(page => {
-                    page.style.transform = `scale(${scale})`;
-                });
-            }, 100);
-
             modalPdfBtn.disabled = false;
             modalDirectPrintBtn.disabled = false;
         };
@@ -715,140 +695,117 @@
             modalDirectPrintBtn.disabled = true;
             modalPdfBtn.textContent = 'PDF產生中...';
             
-            try {
-                // Re-fetch all data to ensure consistency
-                const names = dataImport.value.trim().split('\n').filter(name => name.trim());
-                const variableElementTpl = labelCanvas.querySelector('.variable-text');
-                const labelWidthCm = parseFloat(labelWidthInput.value) || 0;
-                const labelHeightCm = parseFloat(labelHeightInput.value) || 0;
-                const orientation = paperOrientationSelect.value;
-                const A4_PAGE_WIDTH_CM = orientation === 'portrait' ? 21 : 29.7;
-                const A4_PAGE_HEIGHT_CM = orientation === 'portrait' ? 29.7 : 21;
-                const margin = 0.5;
-                const A4_PRINT_WIDTH_CM = A4_PAGE_WIDTH_CM - (margin * 2);
-                const A4_PRINT_HEIGHT_CM = A4_PAGE_HEIGHT_CM - (margin * 2);
-                const cols = Math.floor(A4_PRINT_WIDTH_CM / labelWidthCm);
-                const rows = Math.floor(A4_PRINT_HEIGHT_CM / labelHeightCm);
-                const labelsPerPage = cols * rows;
+            // Re-fetch all data to ensure consistency
+            const names = dataImport.value.trim().split('\n').filter(name => name.trim());
+            const variableElementTpl = labelCanvas.querySelector('.variable-text');
+            const labelWidthCm = parseFloat(labelWidthInput.value) || 0;
+            const labelHeightCm = parseFloat(labelHeightInput.value) || 0;
+            const orientation = paperOrientationSelect.value;
+            const A4_PAGE_WIDTH_CM = orientation === 'portrait' ? 21 : 29.7;
+            const A4_PAGE_HEIGHT_CM = orientation === 'portrait' ? 29.7 : 21;
+            const margin = 0.5;
+            const A4_PRINT_WIDTH_CM = A4_PAGE_WIDTH_CM - (margin * 2);
+            const A4_PRINT_HEIGHT_CM = A4_PAGE_HEIGHT_CM - (margin * 2);
+            const cols = Math.floor(A4_PRINT_WIDTH_CM / labelWidthCm);
+            const rows = Math.floor(A4_PRINT_HEIGHT_CM / labelHeightCm);
+            const labelsPerPage = cols * rows;
 
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF({
-                    orientation: orientation === 'portrait' ? 'p' : 'l',
-                    unit: 'cm',
-                    format: 'a4'
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: orientation === 'portrait' ? 'p' : 'l',
+                unit: 'cm',
+                format: 'a4'
+            });
+
+            // Add font to VFS
+            if(window.noto_sans_tc_normal_b64) {
+                 doc.addFileToVFS('NotoSansTC-Regular.ttf', window.noto_sans_tc_normal_b64);
+                 doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
+                 doc.setFont('NotoSansTC', 'normal');
+            } else {
+                console.warn("Font data not loaded. PDF text may not render correctly.");
+            }
+
+            // Convert image elements to data URLs to embed them
+            const imagePromises = Array.from(labelCanvas.querySelectorAll('img')).map(img => {
+                return new Promise((resolve) => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const image = new Image();
+                    image.crossOrigin = 'Anonymous';
+                    image.onload = () => {
+                        canvas.width = image.naturalWidth;
+                        canvas.height = image.naturalHeight;
+                        ctx.drawImage(image, 0, 0);
+                        resolve({ originalSrc: img.src, dataUrl: canvas.toDataURL('image/png') });
+                    };
+                    image.onerror = () => resolve({ originalSrc: img.src, dataUrl: null });
+                    image.src = img.src;
                 });
+            });
 
-                // Add font to VFS
-                if(window.noto_sans_tc_normal_b64) {
-                    doc.addFileToVFS('NotoSansTC-Regular.ttf', window.noto_sans_tc_normal_b64);
-                    doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
-                    doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'bold'); // Register bold variant
-                    doc.setFont('NotoSansTC');
-                } else {
-                    console.warn("Font data not loaded. PDF text may not render correctly.");
-                    alert('字型資料載入失敗，PDF中的中文可能無法顯示。');
-                }
+            const imageDataMap = (await Promise.all(imagePromises)).reduce((acc, current) => {
+                if (current.dataUrl) acc[current.originalSrc] = current.dataUrl;
+                return acc;
+            }, {});
 
-                const imagePromises = Array.from(labelCanvas.querySelectorAll('img')).map(img => {
-                    return new Promise((resolve) => {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        const image = new Image();
-                        image.crossOrigin = 'Anonymous';
-                        image.onload = () => {
-                            canvas.width = image.naturalWidth;
-                            canvas.height = image.naturalHeight;
-                            ctx.drawImage(image, 0, 0);
-                            resolve({ originalSrc: img.src, dataUrl: canvas.toDataURL('image/png') });
-                        };
-                        image.onerror = () => resolve({ originalSrc: img.src, dataUrl: null });
-                        image.src = img.src;
-                    });
-                });
+            let nameIndex = 0;
+            for (let pageNum = 0; pageNum < Math.ceil(names.length / labelsPerPage); pageNum++) {
+                if (pageNum > 0) doc.addPage();
+                
+                doc.setLineWidth(0.01); // Set a thin line width for borders
 
-                const imageDataMap = (await Promise.all(imagePromises)).reduce((acc, current) => {
-                    if (current.dataUrl) acc[current.originalSrc] = current.dataUrl;
-                    return acc;
-                }, {});
+                for (let i = 0; i < labelsPerPage && nameIndex < names.length; i++) {
+                    const currentName = names[nameIndex++];
+                    const row = Math.floor(i / cols);
+                    const col = i % cols;
+                    const x_cm = margin + col * labelWidthCm;
+                    const y_cm = margin + row * labelHeightCm;
 
-                let nameIndex = 0;
-                for (let pageNum = 0; pageNum < Math.ceil(names.length / labelsPerPage); pageNum++) {
-                    if (pageNum > 0) doc.addPage();
-                    
-                    doc.setLineWidth(0.01); 
+                    // Draw label border
+                    doc.rect(x_cm, y_cm, labelWidthCm, labelHeightCm);
 
-                    for (let i = 0; i < labelsPerPage && nameIndex < names.length; i++) {
-                        const currentName = names[nameIndex++];
-                        const row = Math.floor(i / cols);
-                        const col = i % cols;
-                        const x_cm = margin + col * labelWidthCm;
-                        const y_cm = margin + row * labelHeightCm;
+                    // Draw elements
+                    for (const node of labelCanvas.children) {
+                        if (!node.classList.contains('draggable')) continue;
 
-                        // Draw label border
-                        doc.rect(x_cm, y_cm, labelWidthCm, labelHeightCm);
+                        const style = window.getComputedStyle(node);
+                        const x_ratio = node.offsetLeft / labelCanvas.offsetWidth;
+                        const y_ratio = node.offsetTop / labelCanvas.offsetHeight;
+                        const w_ratio = node.offsetWidth / labelCanvas.offsetWidth;
+                        const h_ratio = node.offsetHeight / labelCanvas.offsetHeight;
 
-                        // Draw elements
-                        for (const node of labelCanvas.children) {
-                            if (!node.classList.contains('draggable')) continue;
-
-                            const style = window.getComputedStyle(node);
-                            const x_ratio = node.offsetLeft / labelCanvas.offsetWidth;
-                            const y_ratio = node.offsetTop / labelCanvas.offsetHeight;
-                            const w_ratio = node.offsetWidth / labelCanvas.offsetWidth;
-                            const h_ratio = node.offsetHeight / labelCanvas.offsetHeight;
-
-                            const elemX = x_cm + (x_ratio * labelWidthCm);
-                            const elemY = y_cm + (y_ratio * labelHeightCm);
-                            const elemW = w_ratio * labelWidthCm;
-                            const elemH = h_ratio * labelHeightCm;
-                            
-                            if (node.querySelector('img')) {
-                                const imgSrc = node.querySelector('img').src;
-                                if (imageDataMap[imgSrc]) {
-                                    doc.addImage(imageDataMap[imgSrc], 'PNG', elemX, elemY, elemW, elemH);
-                                }
-                            } else if (node.classList.contains('text-element')) {
-                                const textContent = node.classList.contains('variable-text') ? currentName : node.textContent;
-                                const fontSizePt = (parseFloat(style.fontSize) * 72) / 96;
-                                
-                                doc.setFont('NotoSansTC', style.fontWeight === '700' ? 'bold' : 'normal');
-                                doc.setFontSize(fontSizePt);
-                                doc.setTextColor(style.color);
-                                doc.text(textContent, elemX + elemW / 2, elemY + elemH / 2, { align: 'center', baseline: 'middle' });
+                        const elemX = x_cm + (x_ratio * labelWidthCm);
+                        const elemY = y_cm + (y_ratio * labelHeightCm);
+                        const elemW = w_ratio * labelWidthCm;
+                        const elemH = h_ratio * labelHeightCm;
+                        
+                        if (node.querySelector('img')) {
+                            const imgSrc = node.querySelector('img').src;
+                            if (imageDataMap[imgSrc]) {
+                                doc.addImage(imageDataMap[imgSrc], 'PNG', elemX, elemY, elemW, elemH);
                             }
+                        } else if (node.classList.contains('text-element')) {
+                            const textContent = node.classList.contains('variable-text') ? currentName : node.textContent;
+                            const fontSizePt = (parseFloat(style.fontSize) * 72) / 96;
+                            
+                            doc.setFont('NotoSansTC', style.fontWeight === '700' ? 'bold' : 'normal'); // Use the embedded font
+                            doc.setFontSize(fontSizePt);
+                            doc.setTextColor(style.color);
+                            doc.text(textContent, elemX + elemW / 2, elemY + elemH / 2, { align: 'center', baseline: 'middle' });
                         }
                     }
                 }
-
-                doc.save(`labels_${new Date().toISOString().slice(0,10)}.pdf`);
-            } catch (error) {
-                console.error("PDF generation failed:", error);
-                alert("產生PDF時發生錯誤，請檢查主控台以獲取詳細資訊。");
-            } finally {
-                modalPdfBtn.disabled = false;
-                modalDirectPrintBtn.disabled = false;
-                modalPdfBtn.textContent = '下載 PDF';
             }
+
+            doc.save(`labels_${new Date().toISOString().slice(0,10)}.pdf`);
+            modalPdfBtn.disabled = false;
+            modalDirectPrintBtn.disabled = false;
+            modalPdfBtn.textContent = '下載 PDF 檔案';
         });
 
         document.addEventListener('DOMContentLoaded', () => {
             updateCanvasSize();
-            // Load Font Data
-            fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/notosanstc/NotoSansTC-Regular.ttf')
-                .then(res => res.arrayBuffer())
-                .then(buffer => {
-                     let binary = '';
-                     const bytes = new Uint8Array(buffer);
-                     for (let i = 0; i < bytes.byteLength; i++) {
-                        binary += String.fromCharCode(bytes[i]);
-                     }
-                     window.noto_sans_tc_normal_b64 = btoa(binary);
-                     console.log('Noto Sans TC font loaded for PDF generation.');
-                }).catch(err => {
-                    console.error("Failed to load font for PDF:", err);
-                    alert("警告：PDF中文字型載入失敗，產生的PDF可能無法正確顯示中文。");
-                });
-
         });
         new ResizeObserver(updateCanvasSize).observe(document.getElementById('label-canvas-container'));
     </script>
