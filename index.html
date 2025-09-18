@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>西北標籤列印小工具</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
         /* 自訂樣式 */
         html, body {
@@ -13,7 +16,7 @@
             overflow: hidden; /* 禁用頂層滾動 */
         }
         body {
-            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            font-family: 'Noto Sans TC', sans-serif;
         }
         #label-canvas {
             width: 100%; 
@@ -172,11 +175,28 @@
                 <div class="pt-4 border-t">
                     <h3 class="text-sm font-medium text-slate-700 mb-2">4. 文字樣式 (需選取文字)</h3>
                     <div class="grid grid-cols-2 gap-4">
+                        <div class="col-span-2">
+                             <label for="font-family" class="block text-sm font-medium text-slate-600 mb-1">字型</label>
+                             <select id="font-family" class="w-full p-2 border border-slate-300 rounded-md bg-white">
+                                <option value="'Noto Sans TC', sans-serif" selected>思源黑體 (Noto Sans TC)</option>
+                                <option value="'Roboto', sans-serif">Roboto</option>
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="'Times New Roman', serif">Times New Roman</option>
+                                <option value="'Courier New', monospace">Courier New</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label for="font-weight" class="block text-sm font-medium text-slate-600 mb-1">粗細</label>
+                            <select id="font-weight" class="w-full p-2 border border-slate-300 rounded-md bg-white">
+                                <option value="normal" selected>標準</option>
+                                <option value="bold">粗體</option>
+                            </select>
+                        </div>
                         <div>
                             <label for="font-size" class="block text-sm font-medium text-slate-600 mb-1">大小(px)</label>
                             <input type="number" id="font-size" value="20" min="8" class="w-full p-2 border border-slate-300 rounded-md">
                         </div>
-                        <div>
+                        <div class="col-span-2">
                             <label for="font-color" class="block text-sm font-medium text-slate-600 mb-1">顏色</label>
                             <input type="color" id="font-color" value="#000000" class="w-full h-10 p-1 border border-slate-300 rounded-md">
                         </div>
@@ -244,6 +264,8 @@
         const labelHeightInput = document.getElementById('label-height');
         const applySizeBtn = document.getElementById('apply-size-btn');
         const paperOrientationSelect = document.getElementById('paper-orientation');
+        const fontFamilySelect = document.getElementById('font-family');
+        const fontWeightSelect = document.getElementById('font-weight');
         const fontSizeInput = document.getElementById('font-size');
         const fontColorInput = document.getElementById('font-color');
         const textOrientationSelect = document.getElementById('text-orientation');
@@ -367,6 +389,19 @@
             if (activeElement.classList.contains('text-element')) {
                 setVariableBtn.disabled = false;
                 const computedStyle = getComputedStyle(activeElement);
+                const currentFont = computedStyle.fontFamily.split(',')[0].replace(/"/g, '').trim();
+                
+                // Find and set the correct font family in the dropdown
+                let foundFont = false;
+                Array.from(fontFamilySelect.options).forEach(opt => {
+                    if (opt.value.includes(currentFont)) {
+                        fontFamilySelect.value = opt.value;
+                        foundFont = true;
+                    }
+                });
+                if (!foundFont) fontFamilySelect.selectedIndex = 0; // fallback
+
+                fontWeightSelect.value = computedStyle.fontWeight;
                 fontSizeInput.value = parseInt(computedStyle.fontSize);
                 fontColorInput.value = rgbToHex(computedStyle.color);
                 textOrientationSelect.value = computedStyle.writingMode === 'vertical-rl' ? 'vertical-rl' : 'horizontal-tb';
@@ -432,6 +467,8 @@
             textElement.className = 'draggable text-element';
             textElement.textContent = text;
             textElement.contentEditable = true;
+            textElement.style.fontFamily = fontFamilySelect.value;
+            textElement.style.fontWeight = fontWeightSelect.value;
             textElement.style.fontSize = `${fontSizeInput.value}px`;
             textElement.style.color = fontColorInput.value;
             textElement.style.writingMode = textOrientationSelect.value;
@@ -450,12 +487,14 @@
 
         const updateActiveTextStyle = () => {
             if (activeElement && activeElement.classList.contains('text-element')) {
+                activeElement.style.fontFamily = fontFamilySelect.value;
+                activeElement.style.fontWeight = fontWeightSelect.value;
                 activeElement.style.fontSize = `${fontSizeInput.value}px`;
                 activeElement.style.color = fontColorInput.value;
                 activeElement.style.writingMode = textOrientationSelect.value;
             }
         };
-        [fontSizeInput, fontColorInput, textOrientationSelect].forEach(input => input.addEventListener('input', updateActiveTextStyle));
+        [fontFamilySelect, fontWeightSelect, fontSizeInput, fontColorInput, textOrientationSelect].forEach(input => input.addEventListener('input', updateActiveTextStyle));
         
         setVariableBtn.addEventListener('click', () => {
             if (activeElement && activeElement.classList.contains('text-element')) {
@@ -498,7 +537,8 @@
                 settings: {
                     width: labelWidthInput.value, height: labelHeightInput.value,
                     orientation: paperOrientationSelect.value, fontSize: fontSizeInput.value,
-                    fontColor: fontColorInput.value, textOrientation: textOrientationSelect.value
+                    fontColor: fontColorInput.value, textOrientation: textOrientationSelect.value,
+                    fontFamily: fontFamilySelect.value, fontWeight: fontWeightSelect.value
                 }
             };
             const dataStr = JSON.stringify(templateData, null, 2);
@@ -520,6 +560,8 @@
                 labelWidthInput.value = settings.width; labelHeightInput.value = settings.height;
                 paperOrientationSelect.value = settings.orientation; fontSizeInput.value = settings.fontSize;
                 fontColorInput.value = settings.fontColor; textOrientationSelect.value = settings.textOrientation || 'horizontal-tb';
+                fontFamilySelect.value = settings.fontFamily || "'Noto Sans TC', sans-serif";
+                fontWeightSelect.value = settings.fontWeight || "normal";
                 
                 labelCanvas.querySelectorAll('.draggable').forEach(makeEditable);
                 updateCanvasSize(); showPlaceholder(); 
@@ -627,6 +669,8 @@
                                 top: ${topPercent}%;
                                 width: ${widthPercent}%;
                                 height: ${heightPercent}%;
+                                font-family: ${computedStyle.fontFamily};
+                                font-weight: ${computedStyle.fontWeight};
                                 font-size: ${scaledFontSize}px;
                                 color: ${computedStyle.color};
                                 writing-mode: ${computedStyle.writingMode};
