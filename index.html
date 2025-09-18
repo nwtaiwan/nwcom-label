@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>西北標籤列印小工具</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
@@ -66,7 +67,7 @@
 
         /* A4 列印專用樣式 */
         .a4-page {
-            padding: 1cm; /* 上下左右邊界各1cm */
+            padding: 0.5cm; /* 上下左右邊界各0.5cm */
             box-sizing: border-box;
             background: white;
             page-break-after: always;
@@ -82,7 +83,7 @@
         }
 
         .label-cell {
-            border: 0.5px solid #ccc; /* 標籤框線 */
+            border: 1px solid #ccc; /* 標籤框線 */
             box-sizing: border-box;
             overflow: hidden;
             position: relative;
@@ -246,7 +247,7 @@
                 <label for="data-import" class="block text-sm font-medium text-slate-700">匯入列印清單 (一行一個)</label>
                 <textarea id="data-import" rows="8" class="flex-grow w-full p-2 border rounded-md" placeholder="王小明..."></textarea>
                 <button id="generate-preview-btn" class="w-full px-6 py-2 bg-orange-500 text-white font-bold rounded-md hover:bg-orange-600">產生A4列印預覽</button>
-                <button id="modal-print-btn" class="w-full px-6 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 disabled:bg-gray-400" disabled>列印預覽內容</button>
+                <button id="modal-pdf-btn" class="w-full px-6 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 disabled:bg-gray-400" disabled>下載 PDF 檔案</button>
             </div>
             <div id="modal-print-preview" class="w-2/3 bg-gray-200 p-4 rounded-md overflow-y-auto">
                 <div class="text-center text-gray-500">預覽區域</div>
@@ -282,7 +283,7 @@
         const closeBulkPrintBtn = document.getElementById('close-bulk-print-btn');
         const generatePreviewBtn = document.getElementById('generate-preview-btn');
         const modalPrintPreview = document.getElementById('modal-print-preview');
-        const modalPrintBtn = document.getElementById('modal-print-btn');
+        const modalPdfBtn = document.getElementById('modal-pdf-btn');
         const saveBtn = document.getElementById('save-btn');
         const loadBtn = document.getElementById('load-btn');
         const fileLoader = document.getElementById('file-loader');
@@ -597,21 +598,24 @@
                 }
             };
             reader.readAsText(file);
-            e.target.value = ''; // Reset for re-uploading same file
+            e.target.value = '';
         });
 
 
         openBulkPrintBtn.addEventListener('click', () => bulkPrintModal.classList.remove('hidden'));
         closeBulkPrintBtn.addEventListener('click', () => bulkPrintModal.classList.add('hidden'));
         
-        generatePreviewBtn.addEventListener('click', () => {
+        const generatePreviewAndPreparePdf = async () => {
+            modalPdfBtn.disabled = true;
+            modalPdfBtn.textContent = 'PDF產生中...';
+
             const names = dataImport.value.trim().split('\n').filter(name => name.trim());
-            if (names.length === 0) { alert('請匯入列印清單。'); return; }
+            if (names.length === 0) { alert('請匯入列印清單。'); modalPdfBtn.textContent = '下載 PDF 檔案'; return; }
             const variableElementTpl = labelCanvas.querySelector('.variable-text');
-            if (!variableElementTpl) { alert('請先在範本中選取一個文字物件，並點擊「設定為變動欄位」。'); return; }
+            if (!variableElementTpl) { alert('請先在範本中選取一個文字物件，並點擊「設定為變動欄位」。'); modalPdfBtn.textContent = '下載 PDF 檔案'; return; }
             const labelWidthCm = parseFloat(labelWidthInput.value) || 0;
             const labelHeightCm = parseFloat(labelHeightInput.value) || 0;
-            if (labelWidthCm <= 0 || labelHeightCm <= 0) { alert("標籤尺寸必須大於0。"); return; }
+            if (labelWidthCm <= 0 || labelHeightCm <= 0) { alert("標籤尺寸必須大於0。"); modalPdfBtn.textContent = '下載 PDF 檔案'; return; }
 
             const orientation = paperOrientationSelect.value;
             const A4_PAGE_WIDTH_CM = orientation === 'portrait' ? 21 : 29.7;
@@ -620,63 +624,49 @@
             const A4_PRINT_HEIGHT_CM = A4_PAGE_HEIGHT_CM - 1;
             const cols = Math.floor(A4_PRINT_WIDTH_CM / labelWidthCm);
             const rows = Math.floor(A4_PRINT_HEIGHT_CM / labelHeightCm);
-            if (cols === 0 || rows === 0) { alert(`標籤尺寸太大，無法放入A4紙張中。`); return; }
+            if (cols === 0 || rows === 0) { alert(`標籤尺寸太大，無法放入A4紙張中。`); modalPdfBtn.textContent = '下載 PDF 檔案'; return; }
 
+            // --- Generate On-Screen Preview (SVG) ---
             modalPrintPreview.innerHTML = '';
             const labelsPerPage = cols * rows;
             const numPages = Math.ceil(names.length / labelsPerPage);
-            
             const canvasRect = labelCanvas.getBoundingClientRect();
             const canvasWidth = canvasRect.width;
             const canvasHeight = canvasRect.height;
-            
-            // --- SVG Generation Logic ---
+
             const generateSvgContent = (dynamicText) => {
                 let svgElements = '';
                 Array.from(labelCanvas.children).forEach(node => {
                     if (!node.classList.contains('draggable')) return;
-                    
                     const style = window.getComputedStyle(node);
-                    const x = node.offsetLeft;
-                    const y = node.offsetTop;
-                    const w = node.offsetWidth;
-                    const h = node.offsetHeight;
-
+                    const x = node.offsetLeft; const y = node.offsetTop;
+                    const w = node.offsetWidth; const h = node.offsetHeight;
                     if (node.querySelector('img')) {
                         const img = node.querySelector('img');
                         svgElements += `<image href="${img.src}" x="${x}" y="${y}" width="${w}" height="${h}" />`;
                     } else if (node.classList.contains('text-element')) {
-                        let textContent = node.textContent;
-                        if (node.classList.contains('variable-text')) {
-                            textContent = dynamicText;
-                        }
-                        
+                        let textContent = node.classList.contains('variable-text') ? dynamicText : node.textContent;
                         const textStyle = `font-family:${style.fontFamily}; font-size:${style.fontSize}; font-weight:${style.fontWeight}; fill:${style.color};`;
-                        
-                        let textAnchor = "middle";
-                        let dominantBaseline = "middle";
-                        let textX = x + w / 2;
-                        let textY = y + h / 2;
-                        
+                        let textAnchor = "middle"; let dominantBaseline = "middle";
+                        let textX = x + w / 2; let textY = y + h / 2;
                         if (style.writingMode === 'vertical-rl') {
-                             svgElements += `<text x="${textX}" y="${textY}" style="${textStyle}" text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}" writing-mode="vertical-rl">${textContent}</text>`;
+                            svgElements += `<text x="${textX}" y="${textY}" style="${textStyle}" text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}" writing-mode="vertical-rl">${textContent}</text>`;
                         } else {
-                             svgElements += `<text x="${textX}" y="${textY}" style="${textStyle}" text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}">${textContent}</text>`;
+                            svgElements += `<text x="${textX}" y="${textY}" style="${textStyle}" text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}">${textContent}</text>`;
                         }
                     }
                 });
                 return `<svg viewBox="0 0 ${canvasWidth} ${canvasHeight}" preserveAspectRatio="xMidYMid meet">${svgElements}</svg>`;
             };
-
+            
             let nameIndex = 0;
             for (let i = 0; i < numPages; i++) {
                 const page = document.createElement('div');
                 page.className = 'a4-page';
-                page.style.width = `${A4_PAGE_WIDTH_CM}cm`;
-                page.style.height = `${A4_PAGE_HEIGHT_CM}cm`;
+                page.style.width = `${A4_PRINT_WIDTH_CM}cm`;
+                page.style.height = `${A4_PRINT_HEIGHT_CM}cm`;
                 page.style.gridTemplateColumns = `repeat(${cols}, ${labelWidthCm}cm)`;
                 page.style.gridTemplateRows = `repeat(${rows}, ${labelHeightCm}cm)`;
-
                 for (let j = 0; j < labelsPerPage && nameIndex < names.length; j++) {
                     const name = names[nameIndex++];
                     const cell = document.createElement('div');
@@ -686,10 +676,113 @@
                 }
                 modalPrintPreview.appendChild(page);
             }
-            modalPrintBtn.disabled = false;
-        });
+            modalPdfBtn.disabled = false;
+            modalPdfBtn.textContent = '下載 PDF 檔案';
+        };
+
+        generatePreviewBtn.addEventListener('click', generatePreviewAndPreparePdf);
         
-        modalPrintBtn.addEventListener('click', () => window.print());
+        // --- PDF Generation Logic ---
+        modalPdfBtn.addEventListener('click', async () => {
+            modalPdfBtn.disabled = true;
+            modalPdfBtn.textContent = 'PDF產生中...';
+            
+            // Re-fetch all data to ensure consistency
+            const names = dataImport.value.trim().split('\n').filter(name => name.trim());
+            const variableElementTpl = labelCanvas.querySelector('.variable-text');
+            const labelWidthCm = parseFloat(labelWidthInput.value) || 0;
+            const labelHeightCm = parseFloat(labelHeightInput.value) || 0;
+            const orientation = paperOrientationSelect.value;
+            const A4_PAGE_WIDTH_CM = orientation === 'portrait' ? 21 : 29.7;
+            const A4_PAGE_HEIGHT_CM = orientation === 'portrait' ? 29.7 : 21;
+            const margin = 0.5;
+            const A4_PRINT_WIDTH_CM = A4_PAGE_WIDTH_CM - (margin * 2);
+            const A4_PRINT_HEIGHT_CM = A4_PAGE_HEIGHT_CM - (margin * 2);
+            const cols = Math.floor(A4_PRINT_WIDTH_CM / labelWidthCm);
+            const rows = Math.floor(A4_PRINT_HEIGHT_CM / labelHeightCm);
+            const labelsPerPage = cols * rows;
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: orientation === 'portrait' ? 'p' : 'l',
+                unit: 'cm',
+                format: 'a4'
+            });
+
+            // Convert image elements to data URLs to embed them
+            const imagePromises = Array.from(labelCanvas.querySelectorAll('img')).map(img => {
+                return new Promise((resolve) => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const image = new Image();
+                    image.crossOrigin = 'Anonymous';
+                    image.onload = () => {
+                        canvas.width = image.naturalWidth;
+                        canvas.height = image.naturalHeight;
+                        ctx.drawImage(image, 0, 0);
+                        resolve({ originalSrc: img.src, dataUrl: canvas.toDataURL('image/png') });
+                    };
+                    image.onerror = () => resolve({ originalSrc: img.src, dataUrl: null }); // Handle error
+                    image.src = img.src;
+                });
+            });
+
+            const imageDataMap = (await Promise.all(imagePromises)).reduce((acc, current) => {
+                if (current.dataUrl) acc[current.originalSrc] = current.dataUrl;
+                return acc;
+            }, {});
+
+            let nameIndex = 0;
+            for (let pageNum = 0; pageNum < Math.ceil(names.length / labelsPerPage); pageNum++) {
+                if (pageNum > 0) doc.addPage();
+                
+                for (let i = 0; i < labelsPerPage && nameIndex < names.length; i++) {
+                    const currentName = names[nameIndex++];
+                    const row = Math.floor(i / cols);
+                    const col = i % cols;
+                    const x_cm = margin + col * labelWidthCm;
+                    const y_cm = margin + row * labelHeightCm;
+
+                    // Draw label border
+                    doc.rect(x_cm, y_cm, labelWidthCm, labelHeightCm);
+
+                    // Draw elements
+                    for (const node of labelCanvas.children) {
+                        if (!node.classList.contains('draggable')) continue;
+
+                        const style = window.getComputedStyle(node);
+                        const x_ratio = node.offsetLeft / labelCanvas.offsetWidth;
+                        const y_ratio = node.offsetTop / labelCanvas.offsetHeight;
+                        const w_ratio = node.offsetWidth / labelCanvas.offsetWidth;
+                        const h_ratio = node.offsetHeight / labelCanvas.offsetHeight;
+
+                        const elemX = x_cm + (x_ratio * labelWidthCm);
+                        const elemY = y_cm + (y_ratio * labelHeightCm);
+                        const elemW = w_ratio * labelWidthCm;
+                        const elemH = h_ratio * labelHeightCm;
+                        
+                        if (node.querySelector('img')) {
+                            const imgSrc = node.querySelector('img').src;
+                            if (imageDataMap[imgSrc]) {
+                                doc.addImage(imageDataMap[imgSrc], 'PNG', elemX, elemY, elemW, elemH);
+                            }
+                        } else if (node.classList.contains('text-element')) {
+                            const textContent = node.classList.contains('variable-text') ? currentName : node.textContent;
+                            const fontSizePt = (parseFloat(style.fontSize) * 72) / 96; // px to pt
+                            
+                            doc.setFont(style.fontFamily.split(',')[0].replace(/'/g, '').trim(), style.fontWeight === '700' ? 'bold' : 'normal');
+                            doc.setFontSize(fontSizePt);
+                            doc.setTextColor(style.color);
+                            doc.text(textContent, elemX + elemW / 2, elemY + elemH / 2, { align: 'center', baseline: 'middle' });
+                        }
+                    }
+                }
+            }
+
+            doc.save(`labels_${new Date().toISOString().slice(0,10)}.pdf`);
+            modalPdfBtn.disabled = false;
+            modalPdfBtn.textContent = '下載 PDF 檔案';
+        });
 
         document.addEventListener('DOMContentLoaded', () => {
             updateCanvasSize();
@@ -698,4 +791,3 @@
     </script>
 </body>
 </html>
-
