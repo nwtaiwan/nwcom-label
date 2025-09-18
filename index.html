@@ -83,11 +83,17 @@
                 padding: 0;
                 background: #fff;
             }
-            #main-container {
-                display: none;
+            body * {
+                visibility: hidden;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
             }
             #print-area {
-                display: block;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
             }
             .a4-page {
                 margin: 0;
