@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>標籤列印程式 (大量匯入版)</title>
+    <title>西北標籤列印小工具</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 自訂樣式 */
@@ -32,10 +32,10 @@
         }
         .text-element {
             padding: 5px;
-            border: 1px solid transparent;
+            border: 1px solid transparent; /* 預設透明邊框 */
         }
         .text-element:hover, .text-element:focus {
-            border: 1px solid #3b82f6;
+            /* 移除舊的 hover 效果，改由 JS 控制 outline */
         }
         .resizer {
             width: 10px;
@@ -107,7 +107,7 @@
 <body class="bg-slate-100 flex flex-col items-center min-h-screen p-4">
 
     <div id="main-container" class="w-full max-w-4xl bg-white rounded-lg shadow-xl p-6">
-        <h1 class="text-3xl font-bold text-center text-slate-800 mb-2">標籤列印程式</h1>
+        <h1 class="text-3xl font-bold text-center text-slate-800 mb-2">西北標籤列印小工具</h1>
         <p class="text-center text-slate-500 mb-6">設計範本、匯入清單，快速產生大量標籤。</p>
         
         <!-- 設計與控制 -->
@@ -163,6 +163,25 @@
                         </div>
                     </div>
                 </div>
+                <!-- 文字樣式設定 -->
+                <div class="mt-4 pt-4 border-t">
+                    <h3 class="text-sm font-medium text-slate-700 mb-2">4. 文字樣式 (需先選取文字)</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="font-size" class="block text-sm font-medium text-slate-600 mb-1">字體大小 (px)</label>
+                            <input type="number" id="font-size" value="20" min="8" class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                        <div>
+                            <label for="font-color" class="block text-sm font-medium text-slate-600 mb-1">字體顏色</label>
+                            <input type="color" id="font-color" value="#000000" class="w-full h-10 p-1 border border-slate-300 rounded-md">
+                        </div>
+                        <div>
+                            <label for="border-color" class="block text-sm font-medium text-slate-600 mb-1">邊線顏色</label>
+                            <input type="color" id="border-color" value="#ffffff" class="w-full h-10 p-1 border border-slate-300 rounded-md">
+                        </div>
+                    </div>
+                </div>
+
                 <div class="mt-6 border-t pt-4 flex justify-end space-x-2">
                     <button id="clear-btn" class="px-4 py-2 bg-slate-500 text-white font-semibold rounded-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400">清空範本</button>
                     <button id="print-btn" class="px-6 py-2 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">列印</button>
@@ -170,19 +189,11 @@
             </div>
         </div>
 
-        <!-- 資料匯入與大量列印 -->
-        <div class="mt-6 p-4 bg-slate-50 rounded-lg border-t-2 border-slate-200">
-            <h2 class="text-xl font-bold text-slate-700 mb-3">大量列印設定</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label for="data-import" class="block text-sm font-medium text-slate-700 mb-1">4. 匯入列印清單 (一行一個)</label>
-                    <textarea id="data-import" rows="6" class="w-full p-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="王小明&#10;陳大文&#10;林美麗"></textarea>
-                </div>
-                <div class="flex flex-col justify-end items-start md:items-end">
-                     <p class="text-sm text-slate-500 mb-2">在上方設計好範本後，點此產生預覽。</p>
-                    <button id="generate-preview-btn" class="w-full md:w-auto px-6 py-3 bg-orange-500 text-white font-bold rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-400">產生A4列印預覽</button>
-                </div>
-            </div>
+        <!-- 大量列印按鈕 -->
+        <div class="mt-6 p-4 bg-slate-50 rounded-lg border-t-2 border-slate-200 text-center">
+            <h2 class="text-xl font-bold text-slate-700 mb-3">準備大量列印？</h2>
+            <p class="text-slate-500 mb-4">設計好範本後，點擊下方按鈕匯入清單並產生預覽。</p>
+            <button id="open-bulk-print-btn" class="w-full md:w-auto px-6 py-3 bg-orange-500 text-white font-bold rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-400">開啟大量列印設定</button>
         </div>
     </div>
     
@@ -201,6 +212,26 @@
         </div>
       </div>
     </div>
+    
+    <!-- 用於大量列印設定的 Modal -->
+    <div id="bulk-print-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+      <div class="relative top-10 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center pb-3 border-b">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">大量列印設定</h3>
+            <button id="close-bulk-print-btn" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+            </button>
+        </div>
+        <div class="mt-4">
+            <label for="data-import" class="block text-sm font-medium text-slate-700 mb-1">5. 匯入列印清單 (一行一個)</label>
+            <textarea id="data-import" rows="8" class="w-full p-2 border border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="王小明&#10;陳大文&#10;林美麗"></textarea>
+        </div>
+        <div class="mt-4 flex justify-end">
+            <button id="generate-preview-btn" class="w-full md:w-auto px-6 py-3 bg-orange-500 text-white font-bold rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-400">產生A4列印預覽</button>
+        </div>
+      </div>
+    </div>
+
 
     <!-- 用於列印的容器 (預設隱藏) -->
     <div id="print-area" class="hidden"></div>
@@ -216,7 +247,6 @@
         const labelCanvas = document.getElementById('label-canvas');
         const placeholder = document.getElementById('placeholder');
         const printArea = document.getElementById('print-area');
-        const generatePreviewBtn = document.getElementById('generate-preview-btn');
         const dataImport = document.getElementById('data-import');
         const confirmModal = document.getElementById('confirm-modal');
         const confirmOkBtn = document.getElementById('confirm-ok-btn');
@@ -225,6 +255,14 @@
         const labelHeightInput = document.getElementById('label-height');
         const applySizeBtn = document.getElementById('apply-size-btn');
         const paperOrientationSelect = document.getElementById('paper-orientation');
+        const fontSizeInput = document.getElementById('font-size');
+        const fontColorInput = document.getElementById('font-color');
+        const borderColorInput = document.getElementById('border-color');
+        // 大量列印 Modal 元素
+        const openBulkPrintBtn = document.getElementById('open-bulk-print-btn');
+        const bulkPrintModal = document.getElementById('bulk-print-modal');
+        const closeBulkPrintBtn = document.getElementById('close-bulk-print-btn');
+        const generatePreviewBtn = document.getElementById('generate-preview-btn');
 
         let activeElement = null;
 
@@ -331,18 +369,35 @@
 
         const setActive = (element) => {
             labelCanvas.querySelectorAll('.draggable').forEach(el => {
-                el.style.border = '1px solid transparent';
+                el.style.outline = 'none'; // 使用 outline 避免影響排版
                 if (el.querySelector('.resizer')) el.querySelector('.resizer').style.display = 'none';
             });
+
             activeElement = element;
-            activeElement.style.border = '1px dashed #3b82f6';
+            activeElement.style.outline = '2px dashed #3b82f6';
             if (activeElement.querySelector('.resizer')) activeElement.querySelector('.resizer').style.display = 'block';
+
+            // 如果選取的是文字，更新樣式控制項的值
+            if (activeElement.classList.contains('text-element')) {
+                const computedStyle = getComputedStyle(activeElement);
+                fontSizeInput.value = parseInt(computedStyle.fontSize);
+                fontColorInput.value = rgbToHex(computedStyle.color);
+                borderColorInput.value = rgbToHex(computedStyle.borderColor);
+            }
         };
+        
+        // Helper function to convert rgb to hex
+        const rgbToHex = (rgb) => {
+            if (!rgb || !rgb.startsWith('rgb')) return '#000000';
+            let [r, g, b] = rgb.match(/\d+/g).map(Number);
+            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+        };
+
 
         labelCanvas.addEventListener('click', (e) => {
              if (e.target === labelCanvas) {
                 labelCanvas.querySelectorAll('.draggable').forEach(el => {
-                    el.style.border = '1px solid transparent';
+                    el.style.outline = 'none';
                     if(el.querySelector('.resizer')) el.querySelector('.resizer').style.display = 'none';
                 });
                 activeElement = null;
@@ -385,11 +440,20 @@
                 textElement.className = 'draggable text-element';
                 textElement.textContent = text;
                 textElement.contentEditable = true;
-                textElement.style.fontSize = '20px';
+                
+                // 套用目前樣式
+                textElement.style.fontSize = `${fontSizeInput.value}px`;
+                textElement.style.color = fontColorInput.value;
+                if (borderColorInput.value !== '#ffffff') { // 假設白色為無邊線
+                     textElement.style.border = `1px solid ${borderColorInput.value}`;
+                } else {
+                     textElement.style.border = '1px solid transparent';
+                }
+
                 textElement.style.top = '50px';
                 textElement.style.left = '50px';
-                textElement.style.border = '1px solid transparent';
                 textElement.style.width = 'fit-content';
+                
                 labelCanvas.appendChild(textElement);
                 makeEditable(textElement);
                 setActive(textElement);
@@ -399,6 +463,19 @@
         };
         addTextBtn.addEventListener('click', addText);
         textInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addText(); }});
+
+        // 為樣式控制項加上事件監聽
+        const updateActiveElementStyle = () => {
+            if (activeElement && activeElement.classList.contains('text-element')) {
+                activeElement.style.fontSize = `${fontSizeInput.value}px`;
+                activeElement.style.color = fontColorInput.value;
+                activeElement.style.border = `1px solid ${borderColorInput.value}`;
+            }
+        };
+        fontSizeInput.addEventListener('input', updateActiveElementStyle);
+        fontColorInput.addEventListener('input', updateActiveElementStyle);
+        borderColorInput.addEventListener('input', updateActiveElementStyle);
+
 
         printBtn.addEventListener('click', () => { window.print(); });
 
@@ -424,6 +501,20 @@
                 showPlaceholder();
             }
         });
+
+        // 大量列印 Modal 邏輯
+        openBulkPrintBtn.addEventListener('click', () => {
+            bulkPrintModal.classList.remove('hidden');
+        });
+        closeBulkPrintBtn.addEventListener('click', () => {
+            bulkPrintModal.classList.add('hidden');
+        });
+        bulkPrintModal.addEventListener('click', (e) => {
+            if (e.target === bulkPrintModal) {
+                bulkPrintModal.classList.add('hidden');
+            }
+        });
+
 
         // 大量產生預覽
         generatePreviewBtn.addEventListener('click', () => {
@@ -497,18 +588,22 @@
                     
                     const contentWrapper = document.createElement('div');
                     contentWrapper.className = 'label-cell-content';
-                    contentWrapper.innerHTML = labelCanvas.innerHTML;
+                    const clonedCanvasContent = labelCanvas.cloneNode(true);
+                    
+                    // 清理複製出來的內容
+                    clonedCanvasContent.querySelectorAll('.draggable').forEach(el => el.style.outline = 'none');
+                    clonedCanvasContent.querySelectorAll('.resizer').forEach(r => r.remove());
+                    const placeholderEl = clonedCanvasContent.querySelector('#placeholder');
+                    if(placeholderEl) placeholderEl.remove();
+
+                    contentWrapper.innerHTML = clonedCanvasContent.innerHTML;
                     
                     const textEl = contentWrapper.querySelector('.text-element');
                     if (textEl) {
                         textEl.textContent = name;
-                        textEl.style.border = 'none';
                         textEl.contentEditable = false;
                     }
-                    contentWrapper.querySelectorAll('.resizer').forEach(r => r.remove());
-                    const placeholderEl = contentWrapper.querySelector('#placeholder');
-                    if(placeholderEl) placeholderEl.remove();
-
+                    
                     contentWrapper.style.width = `${labelCanvas.offsetWidth}px`;
                     contentWrapper.style.height = `${labelCanvas.offsetHeight}px`;
                     contentWrapper.style.transform = `scale(${scaleFactor})`;
@@ -520,6 +615,7 @@
             }
             
             alert(`${names.length} 個標籤的A4列印預覽已產生 (${numPages} 頁)。請點擊 "列印" 按鈕進行列印。`);
+            bulkPrintModal.classList.add('hidden');
         });
 
     </script>
