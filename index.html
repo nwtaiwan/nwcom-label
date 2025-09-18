@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
         /* 自訂樣式 */
         html, body {
@@ -179,6 +179,9 @@
                              <label for="font-family" class="block text-sm font-medium text-slate-600 mb-1">字型</label>
                              <select id="font-family" class="w-full p-2 border border-slate-300 rounded-md bg-white">
                                 <option value="'Noto Sans TC', sans-serif" selected>思源黑體 (Noto Sans TC)</option>
+                                <option value="'Noto Serif TC', serif">思源宋體 (Noto Serif TC)</option>
+                                <option value="'Microsoft JhengHei', '微軟正黑體', sans-serif">微軟正黑體 (Microsoft JhengHei)</option>
+                                <option value="KaiTi, '標楷體', serif">標楷體 (KaiTi)</option>
                                 <option value="'Roboto', sans-serif">Roboto</option>
                                 <option value="Arial, sans-serif">Arial</option>
                                 <option value="'Times New Roman', serif">Times New Roman</option>
@@ -188,8 +191,8 @@
                          <div>
                             <label for="font-weight" class="block text-sm font-medium text-slate-600 mb-1">粗細</label>
                             <select id="font-weight" class="w-full p-2 border border-slate-300 rounded-md bg-white">
-                                <option value="normal" selected>標準</option>
-                                <option value="bold">粗體</option>
+                                <option value="400" selected>標準</option>
+                                <option value="700">粗體</option>
                             </select>
                         </div>
                         <div>
@@ -391,7 +394,6 @@
                 const computedStyle = getComputedStyle(activeElement);
                 const currentFont = computedStyle.fontFamily.split(',')[0].replace(/"/g, '').trim();
                 
-                // Find and set the correct font family in the dropdown
                 let foundFont = false;
                 Array.from(fontFamilySelect.options).forEach(opt => {
                     if (opt.value.includes(currentFont)) {
@@ -399,9 +401,9 @@
                         foundFont = true;
                     }
                 });
-                if (!foundFont) fontFamilySelect.selectedIndex = 0; // fallback
+                if (!foundFont) fontFamilySelect.selectedIndex = 0;
 
-                fontWeightSelect.value = computedStyle.fontWeight;
+                fontWeightSelect.value = computedStyle.fontWeight === '700' ? '700' : '400';
                 fontSizeInput.value = parseInt(computedStyle.fontSize);
                 fontColorInput.value = rgbToHex(computedStyle.color);
                 textOrientationSelect.value = computedStyle.writingMode === 'vertical-rl' ? 'vertical-rl' : 'horizontal-tb';
@@ -561,7 +563,7 @@
                 paperOrientationSelect.value = settings.orientation; fontSizeInput.value = settings.fontSize;
                 fontColorInput.value = settings.fontColor; textOrientationSelect.value = settings.textOrientation || 'horizontal-tb';
                 fontFamilySelect.value = settings.fontFamily || "'Noto Sans TC', sans-serif";
-                fontWeightSelect.value = settings.fontWeight || "normal";
+                fontWeightSelect.value = settings.fontWeight || "400";
                 
                 labelCanvas.querySelectorAll('.draggable').forEach(makeEditable);
                 updateCanvasSize(); showPlaceholder(); 
