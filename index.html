@@ -48,6 +48,11 @@
         .text-element {
             padding: 5px;
             border: 1px solid transparent; /* 預設透明邊框 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            white-space: nowrap;
         }
         .resizer {
             width: 10px;
@@ -83,10 +88,9 @@
             position: relative;
         }
         
-        /* 這個 class 不再被使用，但保留以防萬一 */
-        .label-cell-content {
-            position: absolute;
-            transform-origin: top left;
+        .label-cell svg {
+            width: 100%;
+            height: 100%;
         }
 
         /* 列印專用樣式 */
@@ -474,7 +478,6 @@
             textElement.style.fontSize = `${fontSizeInput.value}px`;
             textElement.style.color = fontColorInput.value;
             textElement.style.writingMode = textOrientationSelect.value;
-            textElement.style.border = '1px solid transparent';
             textElement.style.top = '50px';
             textElement.style.left = '50px';
             textElement.style.width = 'fit-content';
@@ -626,6 +629,44 @@
             const canvasRect = labelCanvas.getBoundingClientRect();
             const canvasWidth = canvasRect.width;
             const canvasHeight = canvasRect.height;
+            
+            // --- SVG Generation Logic ---
+            const generateSvgContent = (dynamicText) => {
+                let svgElements = '';
+                Array.from(labelCanvas.children).forEach(node => {
+                    if (!node.classList.contains('draggable')) return;
+                    
+                    const style = window.getComputedStyle(node);
+                    const x = node.offsetLeft;
+                    const y = node.offsetTop;
+                    const w = node.offsetWidth;
+                    const h = node.offsetHeight;
+
+                    if (node.querySelector('img')) {
+                        const img = node.querySelector('img');
+                        svgElements += `<image href="${img.src}" x="${x}" y="${y}" width="${w}" height="${h}" />`;
+                    } else if (node.classList.contains('text-element')) {
+                        let textContent = node.textContent;
+                        if (node.classList.contains('variable-text')) {
+                            textContent = dynamicText;
+                        }
+                        
+                        const textStyle = `font-family:${style.fontFamily}; font-size:${style.fontSize}; font-weight:${style.fontWeight}; fill:${style.color};`;
+                        
+                        let textAnchor = "middle";
+                        let dominantBaseline = "middle";
+                        let textX = x + w / 2;
+                        let textY = y + h / 2;
+                        
+                        if (style.writingMode === 'vertical-rl') {
+                             svgElements += `<text x="${textX}" y="${textY}" style="${textStyle}" text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}" writing-mode="vertical-rl">${textContent}</text>`;
+                        } else {
+                             svgElements += `<text x="${textX}" y="${textY}" style="${textStyle}" text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}">${textContent}</text>`;
+                        }
+                    }
+                });
+                return `<svg viewBox="0 0 ${canvasWidth} ${canvasHeight}" preserveAspectRatio="xMidYMid meet">${svgElements}</svg>`;
+            };
 
             let nameIndex = 0;
             for (let i = 0; i < numPages; i++) {
@@ -640,59 +681,7 @@
                     const name = names[nameIndex++];
                     const cell = document.createElement('div');
                     cell.className = 'label-cell';
-                    
-                    // NEW LOGIC: Recreate elements with precise scaling
-                    Array.from(labelCanvas.children).forEach(node => {
-                        if (!node.classList.contains('draggable')) return;
-
-                        // Calculate percentage-based positions and dimensions from the template
-                        const leftPercent = (node.offsetLeft / canvasWidth) * 100;
-                        const topPercent = (node.offsetTop / canvasHeight) * 100;
-                        const widthPercent = (node.offsetWidth / canvasWidth) * 100;
-                        const heightPercent = (node.offsetHeight / canvasHeight) * 100;
-
-                        if (node.querySelector('img')) {
-                            const img = node.querySelector('img');
-                            const newImg = document.createElement('img');
-                            newImg.src = img.src;
-                            newImg.style.cssText = `position:absolute; left:${leftPercent}%; top:${topPercent}%; width:${widthPercent}%; height:${heightPercent}%; object-fit:fill;`;
-                            cell.appendChild(newImg);
-                        } else if (node.classList.contains('text-element')) {
-                            const computedStyle = window.getComputedStyle(node);
-                            const newText = document.createElement('div');
-                            
-                            // Scale font size based on the width ratio
-                            const scaleRatio = (labelWidthCm * 37.795) / canvasWidth;
-                            const scaledFontSize = parseFloat(computedStyle.fontSize) * scaleRatio;
-
-                            newText.style.cssText = `
-                                position: absolute;
-                                left: ${leftPercent}%;
-                                top: ${topPercent}%;
-                                width: ${widthPercent}%;
-                                height: ${heightPercent}%;
-                                font-family: ${computedStyle.fontFamily};
-                                font-weight: ${computedStyle.fontWeight};
-                                font-size: ${scaledFontSize}px;
-                                color: ${computedStyle.color};
-                                writing-mode: ${computedStyle.writingMode};
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                padding: ${5 * scaleRatio}px;
-                                box-sizing: border-box;
-                                white-space: nowrap;
-                            `;
-                            
-                            if (node.classList.contains('variable-text')) {
-                                newText.textContent = name;
-                            } else {
-                                newText.textContent = node.textContent;
-                            }
-                            cell.appendChild(newText);
-                        }
-                    });
-                    
+                    cell.innerHTML = generateSvgContent(name);
                     page.appendChild(cell);
                 }
                 modalPrintPreview.appendChild(page);
@@ -709,4 +698,3 @@
     </script>
 </body>
 </html>
-
