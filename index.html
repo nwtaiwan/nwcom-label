@@ -74,6 +74,7 @@
             display: grid;
             justify-content: start; /* 改為 start 對齊 */
             align-content: start;   /* 改為 start 對齊 */
+            gap: 0; /* 確保標籤之間無間距 */
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             margin: 1rem auto;
         }
@@ -261,7 +262,7 @@
 
     <input type="file" id="file-loader" class="hidden" accept=".json">
     
-    <script id="font-data"></script>
+    <script id="font-loader-script"></script>
 
     <script>
         // DOM Elements
@@ -721,9 +722,11 @@
             if(window.noto_sans_tc_normal_b64) {
                  doc.addFileToVFS('NotoSansTC-Regular.ttf', window.noto_sans_tc_normal_b64);
                  doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
-                 doc.setFont('NotoSansTC', 'normal');
+                 doc.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'bold'); // Register bold variant
+                 doc.setFont('NotoSansTC');
             } else {
                 console.warn("Font data not loaded. PDF text may not render correctly.");
+                alert('字型資料載入失敗，PDF中的中文可能無法顯示。');
             }
 
             // Convert image elements to data URLs to embed them
@@ -801,11 +804,27 @@
             doc.save(`labels_${new Date().toISOString().slice(0,10)}.pdf`);
             modalPdfBtn.disabled = false;
             modalDirectPrintBtn.disabled = false;
-            modalPdfBtn.textContent = '下載 PDF 檔案';
+            modalPdfBtn.textContent = '下載 PDF';
         });
 
         document.addEventListener('DOMContentLoaded', () => {
             updateCanvasSize();
+            // Load Font Data
+            fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/notosanstc/NotoSansTC-Regular.ttf')
+                .then(res => res.arrayBuffer())
+                .then(buffer => {
+                     let binary = '';
+                     const bytes = new Uint8Array(buffer);
+                     for (let i = 0; i < bytes.byteLength; i++) {
+                        binary += String.fromCharCode(bytes[i]);
+                     }
+                     window.noto_sans_tc_normal_b64 = btoa(binary);
+                     console.log('Noto Sans TC font loaded for PDF generation.');
+                }).catch(err => {
+                    console.error("Failed to load font for PDF:", err);
+                    alert("警告：PDF中文字型載入失敗，產生的PDF可能無法正確顯示中文。");
+                });
+
         });
         new ResizeObserver(updateCanvasSize).observe(document.getElementById('label-canvas-container'));
     </script>
