@@ -80,6 +80,7 @@
             position: relative;
         }
         
+        /* 這個 class 不再被使用，但保留以防萬一 */
         .label-cell-content {
             position: absolute;
             transform-origin: top left;
@@ -544,7 +545,11 @@
             modalPrintPreview.innerHTML = '';
             const labelsPerPage = cols * rows;
             const numPages = Math.ceil(names.length / labelsPerPage);
-            const canvasWidth = labelCanvas.offsetWidth;
+            
+            const canvasRect = labelCanvas.getBoundingClientRect();
+            const canvasWidth = canvasRect.width;
+            const canvasHeight = canvasRect.height;
+            
             const cmInPx = 37.795; 
             const targetCellWidthPx = labelWidthCm * cmInPx;
             const scaleFactor = targetCellWidthPx / canvasWidth;
@@ -562,28 +567,40 @@
                     const name = names[nameIndex++];
                     const cell = document.createElement('div');
                     cell.className = 'label-cell';
-                    const clipper = document.createElement('div');
-                    clipper.style.cssText = 'width: 100%; height: 100%; overflow: hidden; position: relative;';
-                    const contentWrapper = document.createElement('div');
-                    contentWrapper.className = 'label-cell-content';
-                    const clonedCanvas = labelCanvas.cloneNode(true);
                     
-                    clonedCanvas.querySelectorAll('.selected, .variable-text').forEach(el => el.classList.remove('selected', 'variable-text'));
-                    clonedCanvas.querySelector('#placeholder')?.remove();
-                    contentWrapper.innerHTML = clonedCanvas.innerHTML;
+                    // Iterate through original canvas elements and recreate them with scaled properties
+                    Array.from(labelCanvas.children).forEach(node => {
+                        if (!node.classList.contains('draggable')) return;
+
+                        const newElem = document.createElement('div');
+                        newElem.style.position = 'absolute';
+                        newElem.style.left = `${(node.offsetLeft / canvasWidth) * 100}%`;
+                        newElem.style.top = `${(node.offsetTop / canvasHeight) * 100}%`;
+                        newElem.style.width = `${(node.offsetWidth / canvasWidth) * 100}%`;
+                        newElem.style.height = `${(node.offsetHeight / canvasHeight) * 100}%`;
+
+                        if (node.querySelector('img')) {
+                            const img = node.querySelector('img');
+                            newElem.innerHTML = `<img src="${img.src}" style="width:100%; height:100%; object-fit:fill;">`;
+                        } else if (node.classList.contains('text-element')) {
+                            const computedStyle = window.getComputedStyle(node);
+                            newElem.textContent = node.textContent;
+                            newElem.style.fontSize = `${parseFloat(computedStyle.fontSize) * scaleFactor}px`; // Scale font size
+                            newElem.style.color = computedStyle.color;
+                            newElem.style.writingMode = computedStyle.writingMode;
+                            newElem.style.display = 'flex';
+                            newElem.style.alignItems = 'center';
+                            newElem.style.justifyContent = 'center';
+                            newElem.style.padding = `${5 * scaleFactor}px`;
+                            newElem.style.boxSizing = 'border-box';
+                            
+                            if (node.classList.contains('variable-text')) {
+                                newElem.textContent = name;
+                            }
+                        }
+                        cell.appendChild(newElem);
+                    });
                     
-                    const textEl = contentWrapper.querySelector(`[style="${variableElementTpl.getAttribute('style')}"]`);
-                    if (textEl) {
-                        textEl.textContent = name;
-                        textEl.contentEditable = false;
-                    }
-                    
-                    contentWrapper.style.width = `${labelCanvas.offsetWidth}px`;
-                    contentWrapper.style.height = `${labelCanvas.offsetHeight}px`;
-                    contentWrapper.style.transform = `scale(${scaleFactor})`;
-                    
-                    clipper.appendChild(contentWrapper);
-                    cell.appendChild(clipper);
                     page.appendChild(cell);
                 }
                 modalPrintPreview.appendChild(page);
