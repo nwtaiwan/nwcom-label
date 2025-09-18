@@ -208,7 +208,6 @@
     </div>
     
     <!-- Modals -->
-    <div id="confirm-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full hidden z-50">...</div>
     <div id="bulk-print-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full hidden z-50 flex items-center justify-center p-4">
       <div class="w-full max-w-3xl bg-white rounded-lg shadow-lg flex flex-col" style="height: 90vh;">
         <div class="flex justify-between items-center p-4 border-b flex-shrink-0">
@@ -228,6 +227,8 @@
         </div>
       </div>
     </div>
+
+    <input type="file" id="file-loader" class="hidden" accept=".json">
 
     <script>
         // DOM Elements
@@ -255,6 +256,7 @@
         const modalPrintBtn = document.getElementById('modal-print-btn');
         const saveBtn = document.getElementById('save-btn');
         const loadBtn = document.getElementById('load-btn');
+        const fileLoader = document.getElementById('file-loader');
         
         let activeElement = null;
 
@@ -489,6 +491,7 @@
             }
         });
 
+        // Save/Load Logic
         saveBtn.addEventListener('click', () => {
             const templateData = {
                 canvasHTML: labelCanvas.innerHTML,
@@ -498,14 +501,20 @@
                     fontColor: fontColorInput.value, textOrientation: textOrientationSelect.value
                 }
             };
-            localStorage.setItem('labelTemplate', JSON.stringify(templateData));
-            alert('範本已儲存!');
+            const dataStr = JSON.stringify(templateData, null, 2);
+            const blob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `標籤範本_${new Date().toISOString().slice(0,10)}.json`;
+            link.href = url;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         });
         
-        const loadTemplate = () => {
-             const savedData = localStorage.getItem('labelTemplate');
-             if (savedData) {
-                const templateData = JSON.parse(savedData);
+        const loadTemplate = (templateData) => {
+             if (templateData && templateData.canvasHTML && templateData.settings) {
                 labelCanvas.innerHTML = templateData.canvasHTML.replace(/ selected/g, '');
                 const settings = templateData.settings;
                 labelWidthInput.value = settings.width; labelHeightInput.value = settings.height;
@@ -513,13 +522,37 @@
                 fontColorInput.value = settings.fontColor; textOrientationSelect.value = settings.textOrientation || 'horizontal-tb';
                 
                 labelCanvas.querySelectorAll('.draggable').forEach(makeEditable);
-                updateCanvasSize(); showPlaceholder(); return true;
+                updateCanvasSize(); showPlaceholder(); 
+                deselectAll();
+                return true;
              }
              return false;
         };
+
         loadBtn.addEventListener('click', () => {
-            if(!loadTemplate()) alert('沒有找到已儲存的範本。');
+            fileLoader.click();
         });
+
+        fileLoader.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    if (!loadTemplate(data)) {
+                        alert('檔案格式錯誤，無法讀取範本。');
+                    }
+                } catch (err) {
+                    alert('讀取檔案失敗，無效的 JSON 格式。');
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = ''; // Reset for re-uploading same file
+        });
+
 
         openBulkPrintBtn.addEventListener('click', () => bulkPrintModal.classList.remove('hidden'));
         closeBulkPrintBtn.addEventListener('click', () => bulkPrintModal.classList.add('hidden'));
@@ -549,10 +582,6 @@
             const canvasRect = labelCanvas.getBoundingClientRect();
             const canvasWidth = canvasRect.width;
             const canvasHeight = canvasRect.height;
-            
-            const cmInPx = 37.795; 
-            const targetCellWidthPx = labelWidthCm * cmInPx;
-            const scaleFactor = targetCellWidthPx / canvasWidth;
 
             let nameIndex = 0;
             for (let i = 0; i < numPages; i++) {
@@ -568,37 +597,54 @@
                     const cell = document.createElement('div');
                     cell.className = 'label-cell';
                     
-                    // Iterate through original canvas elements and recreate them with scaled properties
+                    // NEW LOGIC: Recreate elements with precise scaling
                     Array.from(labelCanvas.children).forEach(node => {
                         if (!node.classList.contains('draggable')) return;
 
-                        const newElem = document.createElement('div');
-                        newElem.style.position = 'absolute';
-                        newElem.style.left = `${(node.offsetLeft / canvasWidth) * 100}%`;
-                        newElem.style.top = `${(node.offsetTop / canvasHeight) * 100}%`;
-                        newElem.style.width = `${(node.offsetWidth / canvasWidth) * 100}%`;
-                        newElem.style.height = `${(node.offsetHeight / canvasHeight) * 100}%`;
+                        // Calculate percentage-based positions and dimensions from the template
+                        const leftPercent = (node.offsetLeft / canvasWidth) * 100;
+                        const topPercent = (node.offsetTop / canvasHeight) * 100;
+                        const widthPercent = (node.offsetWidth / canvasWidth) * 100;
+                        const heightPercent = (node.offsetHeight / canvasHeight) * 100;
 
                         if (node.querySelector('img')) {
                             const img = node.querySelector('img');
-                            newElem.innerHTML = `<img src="${img.src}" style="width:100%; height:100%; object-fit:fill;">`;
+                            const newImg = document.createElement('img');
+                            newImg.src = img.src;
+                            newImg.style.cssText = `position:absolute; left:${leftPercent}%; top:${topPercent}%; width:${widthPercent}%; height:${heightPercent}%; object-fit:fill;`;
+                            cell.appendChild(newImg);
                         } else if (node.classList.contains('text-element')) {
                             const computedStyle = window.getComputedStyle(node);
-                            newElem.textContent = node.textContent;
-                            newElem.style.fontSize = `${parseFloat(computedStyle.fontSize) * scaleFactor}px`; // Scale font size
-                            newElem.style.color = computedStyle.color;
-                            newElem.style.writingMode = computedStyle.writingMode;
-                            newElem.style.display = 'flex';
-                            newElem.style.alignItems = 'center';
-                            newElem.style.justifyContent = 'center';
-                            newElem.style.padding = `${5 * scaleFactor}px`;
-                            newElem.style.boxSizing = 'border-box';
+                            const newText = document.createElement('div');
+                            
+                            // Scale font size based on the width ratio
+                            const scaleRatio = (labelWidthCm * 37.795) / canvasWidth;
+                            const scaledFontSize = parseFloat(computedStyle.fontSize) * scaleRatio;
+
+                            newText.style.cssText = `
+                                position: absolute;
+                                left: ${leftPercent}%;
+                                top: ${topPercent}%;
+                                width: ${widthPercent}%;
+                                height: ${heightPercent}%;
+                                font-size: ${scaledFontSize}px;
+                                color: ${computedStyle.color};
+                                writing-mode: ${computedStyle.writingMode};
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                padding: ${5 * scaleRatio}px;
+                                box-sizing: border-box;
+                                white-space: nowrap;
+                            `;
                             
                             if (node.classList.contains('variable-text')) {
-                                newElem.textContent = name;
+                                newText.textContent = name;
+                            } else {
+                                newText.textContent = node.textContent;
                             }
+                            cell.appendChild(newText);
                         }
-                        cell.appendChild(newElem);
                     });
                     
                     page.appendChild(cell);
@@ -611,7 +657,6 @@
         modalPrintBtn.addEventListener('click', () => window.print());
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadTemplate();
             updateCanvasSize();
         });
         new ResizeObserver(updateCanvasSize).observe(document.getElementById('label-canvas-container'));
