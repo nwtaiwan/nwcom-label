@@ -52,7 +52,7 @@
 
         /* A4 列印專用樣式 */
         .a4-page {
-            padding: 1cm; /* 上下左右邊界各1cm */
+            padding: 0.5cm; /* 上下左右邊界各0.5cm */
             box-sizing: border-box;
             background: white;
             page-break-after: always;
@@ -572,8 +572,8 @@
             const orientation = paperOrientationSelect.value;
             const A4_PAGE_WIDTH_CM = orientation === 'portrait' ? 21 : 29.7;
             const A4_PAGE_HEIGHT_CM = orientation === 'portrait' ? 29.7 : 21;
-            const A4_PRINT_WIDTH_CM = A4_PAGE_WIDTH_CM - 2;
-            const A4_PRINT_HEIGHT_CM = A4_PAGE_HEIGHT_CM - 2;
+            const A4_PRINT_WIDTH_CM = A4_PAGE_WIDTH_CM - 1; // 左右各扣 0.5cm
+            const A4_PRINT_HEIGHT_CM = A4_PAGE_HEIGHT_CM - 1; // 上下各扣 0.5cm
 
             const cols = Math.floor(A4_PRINT_WIDTH_CM / labelWidthCm);
             const rows = Math.floor(A4_PRINT_HEIGHT_CM / labelHeightCm);
