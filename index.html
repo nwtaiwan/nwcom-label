@@ -80,7 +80,7 @@
             justify-content: start; /* 改為 start 對齊 */
             align-content: start;   /* 改為 start 對齊 */
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            margin: 1rem auto;
+            margin: 0 auto 1rem; /* 置頂、水平置中、底部間距 */
             transform-origin: top center;
             transition: transform 0.2s ease-out;
         }
@@ -127,6 +127,7 @@
                 width: 100%;
                 height: auto;
                 overflow: visible;
+                padding: 0;
             }
             .a4-page {
                 margin: 0;
@@ -141,7 +142,7 @@
 
     <header class="flex-shrink-0">
         <h1 class="text-2xl font-bold text-center text-slate-800">西北標籤列印小工具</h1>
-        <p class="text-sm text-center text-slate-500">西北用心  生活安心</p>
+        <p class="text-sm text-center text-slate-500">西北好用心  生活更安心</p>
     </header>
 
     <div id="main-container" class="flex-grow w-full bg-white rounded-lg shadow-xl p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
@@ -267,8 +268,9 @@
                 <label for="data-import" class="block text-sm font-medium text-slate-700">匯入列印清單 (一行一個)</label>
                 <textarea id="data-import" rows="8" class="flex-grow w-full p-2 border rounded-md" placeholder="王小明..."></textarea>
                 <button id="generate-preview-btn" class="w-full px-6 py-2 bg-orange-500 text-white font-bold rounded-md hover:bg-orange-600">生成A4預覽</button>
-                <div class="grid grid-cols-1 gap-2">
+                <div class="grid grid-cols-2 gap-2">
                     <button id="modal-pdf-btn" class="w-full px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 disabled:bg-gray-400" disabled>下載 PDF</button>
+                    <button id="modal-print-pdf-btn" class="w-full px-4 py-2 bg-sky-600 text-white font-semibold rounded-md hover:bg-sky-700 disabled:bg-gray-400" disabled>列印 PDF</button>
                 </div>
             </div>
             <div class="w-2/3 flex flex-col">
@@ -328,6 +330,7 @@
         const generatePreviewBtn = document.getElementById('generate-preview-btn');
         const modalPrintPreview = document.getElementById('modal-print-preview');
         const modalPdfBtn = document.getElementById('modal-pdf-btn');
+        const modalPrintPdfBtn = document.getElementById('modal-print-pdf-btn');
         const saveBtn = document.getElementById('save-btn');
         const loadBtn = document.getElementById('load-btn');
         const fileLoader = document.getElementById('file-loader');
@@ -872,6 +875,7 @@
         
         const generatePreview = async () => {
             modalPdfBtn.disabled = true;
+            modalPrintPdfBtn.disabled = true;
             generatePreviewBtn.disabled = true;
             generatePreviewBtn.textContent = '預覽產生中...';
             modalPrintPreview.innerHTML = `<div class="text-center text-gray-500 p-8">正在產生預覽，請稍候...<br>項目較多時可能需要一些時間。</div>`;
@@ -933,6 +937,7 @@
                         if (variableElementTpl.style.writingMode === 'vertical-rl') {
                             variableElementTpl.style.whiteSpace = 'nowrap';
                             variableElementTpl.style.height = 'auto';
+                            variableElementTpl.offsetHeight; // Force reflow
                             variableElementTpl.style.height = `${variableElementTpl.scrollHeight}px`;
                         }
 
@@ -955,6 +960,7 @@
                 }
                 
                 modalPdfBtn.disabled = false;
+                modalPrintPdfBtn.disabled = false;
                 
                 const firstPage = modalPrintPreview.querySelector('.a4-page');
                 if (firstPage) {
@@ -980,9 +986,14 @@
         };
 
         generatePreviewBtn.addEventListener('click', generatePreview);
+
+        modalPrintPdfBtn.addEventListener('click', () => {
+            window.print();
+        });
        
         modalPdfBtn.addEventListener('click', async () => {
             modalPdfBtn.disabled = true;
+            modalPrintPdfBtn.disabled = true;
             modalPdfBtn.textContent = 'PDF產生中...';
             
             const names = dataImport.value.trim().split('\n').filter(name => name.trim());
@@ -1033,6 +1044,7 @@
                         if (variableElement.style.writingMode === 'vertical-rl') {
                             variableElement.style.whiteSpace = 'nowrap';
                             variableElement.style.height = 'auto';
+                            variableElement.offsetHeight; // Force reflow
                             variableElement.style.height = `${variableElement.scrollHeight}px`;
                         }
                         
@@ -1058,6 +1070,7 @@
                 if (originallySelected) originallySelected.classList.add('selected');
                 labelCanvas.querySelectorAll('.resizer').forEach(r => r.style.display = '');
                 modalPdfBtn.disabled = false;
+                modalPrintPdfBtn.disabled = false;
                 modalPdfBtn.textContent = '下載 PDF';
             }
         });
